@@ -6,6 +6,8 @@ import HeroSection from "@/components/heroSection";
 import MechanicsSection from "@/components/mechanicSection";
 import Footer from "@/components/footer";
 import StatsRibbon from "@/components/stats";
+import TestimonialsSection from "@/components/feedback";
+import FAQSection from "@/components/faq";
 
 export default function Home() {
   return (
@@ -16,6 +18,8 @@ export default function Home() {
     <FeaturedRounds/>
     <ProjectGrid/>
     <MechanicsSection/>
+    <TestimonialsSection/>
+    <FAQSection/>
     <Footer/>
     </>
   );
