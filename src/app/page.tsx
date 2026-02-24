@@ -12,6 +12,7 @@ import FAQSection from "@/components/faq";
 export default function Home() {
   return (
     <>
+     <div className="min-h-screen bg-background">
     <Navbar/>
     <HeroSection/>
     <StatsRibbon/>
@@ -21,6 +22,7 @@ export default function Home() {
     <TestimonialsSection/>
     <FAQSection/>
     <Footer/>
+    </div>
     </>
   );
 }

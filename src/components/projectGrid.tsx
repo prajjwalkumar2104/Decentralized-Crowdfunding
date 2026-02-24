@@ -5,16 +5,24 @@ import { Heart } from "lucide-react";
 
 const projects = [
   {
-    title: "ZK Identity Protocol",
-    desc: "Privacy-preserving identity verification using zero-knowledge proofs for decentralized applications.",
+    title: "Omni-Gov Framework",
+    desc: "A modular governance toolkit featuring cross-chain delegation and decentralized treasury management for DAOs.",
+    raised: 53,
+    goal: "$40,000",
+    supporters: 276,
+    category: "Governance",
+  },
+  {
+    title: "StealthID Protocol",
+    desc: "Zero-knowledge identity layer enabling Sybil-resistant participation in crowdfunding without revealing private data.",
     raised: 72,
     goal: "$45,000",
     supporters: 312,
     category: "Privacy",
   },
   {
-    title: "Carbon Credit DEX",
-    desc: "Decentralized exchange for tokenized carbon credits with real-time satellite verification.",
+    title: "EcoLedger Oracle",
+    desc: "A decentralized oracle network providing real-time carbon sequestration data for milestone-based green funding.",
     raised: 45,
     goal: "$120,000",
     supporters: 189,
@@ -44,16 +52,7 @@ const projects = [
     supporters: 428,
     category: "Infrastructure",
   },
-  {
-    title: "DAO Governance Toolkit",
-    desc: "Modular governance framework with delegation, quadratic voting, and treasury management.",
-    raised: 53,
-    goal: "$40,000",
-    supporters: 276,
-    category: "Governance",
-  },
 ];
-
 const ProjectGrid = () => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
