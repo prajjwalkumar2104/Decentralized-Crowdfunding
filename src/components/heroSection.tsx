@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { ArrowRight, Sparkles } from "lucide-react";
+import Link from "next/link";
 
 const HeroSection = () => {
   return (
@@ -31,10 +32,11 @@ const HeroSection = () => {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <button className="gradient rounded-xl px-8 py-3.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 flex items-center gap-2 w-full sm:w-auto justify-center shadow-sm">
+            <Link href="/createcampaign"><button className="gradient rounded-xl px-8 py-3.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 flex items-center gap-2 w-full sm:w-auto justify-center shadow-sm">
               Launch Project
               <ArrowRight className="h-4 w-4" />
-            </button>
+            </button></Link>
+            
             
             <button className="gradient-border rounded-xl px-8 py-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted w-full sm:w-auto">
               Explore Grants
