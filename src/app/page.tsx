@@ -8,6 +8,7 @@ import Footer from "@/components/footer";
 import StatsRibbon from "@/components/stats";
 import TestimonialsSection from "@/components/feedback";
 import FAQSection from "@/components/faq";
+import Test from"@/components/test";
 
 export default function Home() {
   return (
@@ -15,6 +16,7 @@ export default function Home() {
      <div className="min-h-screen bg-background">
     <Navbar/>
     <HeroSection/>
+    <Test/>
     <StatsRibbon/>
     <FeaturedRounds/>
     <ProjectGrid/>

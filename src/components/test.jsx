@@ -3,7 +3,8 @@ import { useReadContract } from "wagmi";
 import { contractAddress, contractABI } from "@/lib/contract";
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
-
+import { BrowserProvider, Contract } from "ethers";
+ import { useReadContracts } from 'wagmi'
 export default function Test() {
   const { data: campaignIds, isLoading } = useReadContract({
     address: contractAddress,
@@ -11,14 +12,34 @@ export default function Test() {
     functionName: "getCampaigns",
   });
 
+ 
+
+
+  const result = useReadContracts({
+    contracts: [
+      {
+        address: contractAddress,
+        abi: contractABI,
+        functionName: 'campaings',
+        args: [0n],
+      },
+      
+    ],
+  })
+
+
+useEffect(()=>{
+  console.log(campaignIds)
+  console.log( "result: ",result);
+}, [campaignIds , result])
   const [campaigns, setCampaigns] = useState([]);
 
   useEffect(() => {
     async function fetchCampaigns() {
       if (!campaignIds || !Array.isArray(campaignIds) || campaignIds.length === 0) return;
       
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const contract = new ethers.Contract(contractAddress, contractABI, provider);
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const contract = new Contract(contractAddress, contractABI, provider);
 
       const details = await Promise.all(
         campaignIds.map(async (id) => {
@@ -26,7 +47,7 @@ export default function Test() {
           
             const campaign = await contract.getCampaign(id);
             return campaign;
-            console.log(campaign)
+           
           } catch (e) {
             return null;
           }

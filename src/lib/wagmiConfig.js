@@ -6,6 +6,6 @@ export const config = createConfig({
   chains: [sepolia], // change if mainnet
   connectors: [injected()],
   transports: {
-    [sepolia.id]: http(),
+    [sepolia.id]: http(process.env.NEXT_PUBLIC_RPC_URL),
   },
 });
