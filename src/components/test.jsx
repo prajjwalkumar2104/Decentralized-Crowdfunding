@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { BrowserProvider, Contract } from "ethers";
  import { useReadContracts } from 'wagmi'
+
 export default function Test() {
+
   const { data: campaignIds, isLoading } = useReadContract({
     address: contractAddress,
     abi: contractABI,
@@ -20,7 +22,7 @@ export default function Test() {
       {
         address: contractAddress,
         abi: contractABI,
-        functionName: 'campaings',
+        functionName: 'getCampaing',
         args: [0n],
       },
       
@@ -29,9 +31,10 @@ export default function Test() {
 
 
 useEffect(()=>{
-  console.log(campaignIds)
+  console.log(campaignIds , "ids ")
   console.log( "result: ",result);
 }, [campaignIds , result])
+
   const [campaigns, setCampaigns] = useState([]);
 
   useEffect(() => {
@@ -44,8 +47,8 @@ useEffect(()=>{
       const details = await Promise.all(
         campaignIds.map(async (id) => {
           try {
-          
-            const campaign = await contract.getCampaign(id);
+             const campaign = await contract.getCampaign(id);
+            console.log(campaign , " campai")
             return campaign;
            
           } catch (e) {

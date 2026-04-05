@@ -2,60 +2,87 @@
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
 import { Heart } from "lucide-react";
+import { useReadContract } from "wagmi";
+import { contractAddress, contractABI } from "@/lib/contract";
+import { useReadContracts } from "wagmi";
+import { formatEther } from "viem";
+import Link from "next/link";
 
-const projects = [
-  {
-    title: "Omni-Gov Framework",
-    desc: "A modular governance toolkit featuring cross-chain delegation and decentralized treasury management for DAOs.",
-    raised: 53,
-    goal: "$40,000",
-    supporters: 276,
-    category: "Governance",
-  },
-  {
-    title: "StealthID Protocol",
-    desc: "Zero-knowledge identity layer enabling Sybil-resistant participation in crowdfunding without revealing private data.",
-    raised: 72,
-    goal: "$45,000",
-    supporters: 312,
-    category: "Privacy",
-  },
-  {
-    title: "EcoLedger Oracle",
-    desc: "A decentralized oracle network providing real-time carbon sequestration data for milestone-based green funding.",
-    raised: 45,
-    goal: "$120,000",
-    supporters: 189,
-    category: "Climate",
-  },
-  {
-    title: "Open Source LLM Tools",
-    desc: "Building accessible AI tooling for open-source developers with on-chain model governance.",
-    raised: 88,
-    goal: "$30,000",
-    supporters: 547,
-    category: "AI",
-  },
-  {
-    title: "DeFi Education DAO",
-    desc: "Free, multilingual courses on decentralized finance for underserved communities worldwide.",
-    raised: 34,
-    goal: "$60,000",
-    supporters: 203,
-    category: "Education",
-  },
-  {
-    title: "Mesh Network Protocol",
-    desc: "Censorship-resistant communication protocol using decentralized mesh networking infrastructure.",
-    raised: 61,
-    goal: "$85,000",
-    supporters: 428,
-    category: "Infrastructure",
-  },
-];
+type CampaignCard = {
+  id: bigint;
+  owner: string;
+  title: string;
+  description: string;
+  target: bigint;
+  deadline: bigint;
+  amountCollected: bigint;
+  image: string;
+  cancelled: boolean;
+};
+
+const formatEth = (value: bigint) => {
+  const asEth = Number(formatEther(value));
+  return asEth >= 1000 ? `${asEth.toLocaleString(undefined, { maximumFractionDigits: 2 })} ETH` : `${asEth.toFixed(3)} ETH`;
+};
+
+const getProgress = (collected: bigint, target: bigint) => {
+  if (target <= 0n) return 0;
+  const ratio = Number((collected * 10000n) / target) / 100;
+  return Math.min(100, Math.max(0, ratio));
+};
+
+const getDaysLeft = (deadline: bigint) => {
+  const now = Math.floor(Date.now() / 1000);
+  const delta = Number(deadline) - now;
+  if (delta <= 0) return "Ended";
+  const days = Math.ceil(delta / (60 * 60 * 24));
+  return `${days}d left`;
+};
 const ProjectGrid = () => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
+
+  const { data: campaignIds, isLoading: loadingIds } = useReadContract({
+    address: contractAddress,
+    abi: contractABI,
+    functionName: "getCampaigns",
+  });
+
+  const typedCampaignIds = (campaignIds as bigint[] | undefined) ?? [];
+
+  const { data: campaignsResult, isLoading: loadingCampaigns } = useReadContracts({
+    contracts: typedCampaignIds.map((id) => ({
+      address: contractAddress,
+      abi: contractABI,
+      functionName: "getCampaign",
+      args: [id],
+    })),
+    query: {
+      enabled: typedCampaignIds.length > 0,
+    },
+  });
+
+  const campaigns: CampaignCard[] =
+    campaignsResult
+      ?.map((item, index) => {
+        if (item.status !== "success" || !item.result) return null;
+        const result = item.result as unknown as [string, string, string, bigint, bigint, bigint, string, boolean];
+        return {
+          id: typedCampaignIds[index],
+          owner: result[0],
+          title: result[1],
+          description: result[2],
+          target: result[3],
+          deadline: result[4],
+          amountCollected: result[5],
+          image: result[6],
+          cancelled: result[7],
+        };
+      })
+      .filter((campaign): campaign is CampaignCard => campaign !== null)
+      .filter((campaign) => !campaign.cancelled) ?? [];
+
+
 
   return (
     <section id="projects" ref={ref} className="py-24 relative">
@@ -74,59 +101,81 @@ const ProjectGrid = () => {
           </p>
         </motion.div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project, i) => (
-            <motion.div
-              key={project.title}
-              initial={{ opacity: 0, y: 30 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: 0.08 * i, duration: 0.5 }}
-              className="glass-card glass-card-hover rounded-1xl overflow-hidden group cursor-pointer transition-all duration-300"
-            >
-              {/* Image placeholder */}
-              <div className="h-40 relative overflow-hidden bg-muted/30">
-                <div className="absolute inset-0 grid-pattern opacity-40" />
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10" />
-                <div className="absolute top-3 left-3 text-xs font-medium glass-card rounded-full px-3 py-1 text-foreground">
-                  {project.category}
-                </div>
-              </div>
+        {loadingIds || loadingCampaigns ? (
+          <p className="text-center text-muted-foreground">Loading campaigns...</p>
+        ) : campaigns.length === 0 ? (
+          <p className="text-center text-muted-foreground">No active campaigns found.</p>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {campaigns.map((project, i) => {
+              const progress = getProgress(project.amountCollected, project.target);
+              return (
+                <Link href={`/campaign/${project.id.toString()}`} key={project.id.toString()} className="block">
+                  <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={isInView ? { opacity: 1, y: 0 } : {}}
+                    transition={{ delay: 0.08 * i, duration: 0.5 }}
+                    className="glass-card glass-card-hover rounded-1xl overflow-hidden group cursor-pointer transition-all duration-300"
+                  >
+                    <div className="h-40 relative overflow-hidden bg-muted/30">
+                      {project.image ? (
+                        <img
+                          src={project.image}
+                          alt={project.title}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <>
+                          <div className="absolute inset-0 grid-pattern opacity-40" />
+                          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10" />
+                        </>
+                      )}
 
-              <div className="p-5">
-                <h3 className="text-base font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
-                  {project.title}
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-4 line-clamp-2">
-                  {project.desc}
-                </p>
+                      <div className="absolute top-3 left-3 text-xs font-medium glass-card rounded-full px-3 py-1 text-foreground">
+                        #{project.id.toString()}
+                      </div>
+                      <div className="absolute top-3 right-3 text-xs font-medium glass-card rounded-full px-3 py-1 text-foreground">
+                        {getDaysLeft(project.deadline)}
+                      </div>
+                    </div>
 
-                {/* Progress bar */}
-                <div className="mb-4">
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-muted-foreground">{project.raised}% funded</span>
-                    <span className="text-foreground font-medium">{project.goal}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-black transition-all duration-1000"
-                      style={{ width: `${project.raised}%` }}
-                    />
-                  </div>
-                </div>
+                    <div className="p-5">
+                      <h3 className="text-base font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
+                        {project.title || "Untitled Campaign"}
+                      </h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-4 line-clamp-2">
+                        {project.description || "No description provided."}
+                      </p>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Heart className="h-3.5 w-3.5" />
-                    {project.supporters} supporters
-                  </div>
-                  <button className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
-                    Support →
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+                      <div className="mb-4">
+                        <div className="flex justify-between text-xs mb-1.5">
+                          <span className="text-muted-foreground">{progress.toFixed(2)}% funded</span>
+                          <span className="text-foreground font-medium">{formatEth(project.target)}</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-black transition-all duration-1000"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Heart className="h-3.5 w-3.5" />
+                          Raised {formatEth(project.amountCollected)}
+                        </div>
+                        <span className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
+                          View & Support →
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );

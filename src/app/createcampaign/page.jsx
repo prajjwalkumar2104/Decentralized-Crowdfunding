@@ -18,7 +18,7 @@ export default function Campaign() {
 
     const router = useRouter();
 
-const { writeContract } = useWriteContract();
+    const { writeContract } = useWriteContract();
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -48,52 +48,52 @@ const { writeContract } = useWriteContract();
             return { ...prev, milestoneTitles: titles, milestoneAmounts: amounts };
         });
     };
-const alertmsg =()=>{
-     e.preventDefault();
-    alert("Campaing created")
-    router.push('/');
-    
-}
-    const handleSubmit = async (e) => {
-    e.preventDefault();
+    const alertmsg = () => {
+        e.preventDefault();
+        alert("Campaing created")
+        router.push('/');
 
-    try {
-       
-        const deadlineUnix = BigInt(
-            Math.floor(new Date(form.deadline).getTime() / 1000)
-        );
-
-       
-        const ethtarget = parseEther(form.target.toString());
-
-        
-        const milestoneAmountsWei = form.milestoneAmounts.map((amt) =>
-            parseEther(amt.toString())
-        );
-
-        writeContract({
-            address: contractAddress,
-            abi: contractABI,
-            functionName: "createCampaign",
-            args: [
-                form.title,
-                form.description,
-                ethtarget,
-                deadlineUnix,
-                form.image,
-                form.milestoneTitles,
-                milestoneAmountsWei,
-            ],
-        });
-
-        console.log(data)
-          alert("Campaing created")
-    router.push('/');
-
-    } catch (error) {
-        console.error("Transaction Error:", error);
     }
-};
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        try {
+
+            const deadlineUnix = BigInt(
+                Math.floor(new Date(form.deadline).getTime() / 1000)
+            );
+
+
+            const ethtarget = parseEther(form.target.toString());
+
+
+            const milestoneAmountsWei = form.milestoneAmounts.map((amt) =>
+                parseEther(amt.toString())
+            );
+
+            writeContract({
+                address: contractAddress,
+                abi: contractABI,
+                functionName: "createCampaign",
+                args: [
+                    form.title,
+                    form.description,
+                    ethtarget,
+                    deadlineUnix,
+                    form.image,
+                    form.milestoneTitles,
+                    milestoneAmountsWei,
+                ],
+            });
+
+            // console.log(data)
+            alert("Campaing created")
+            router.push('/');
+
+        } catch (error) {
+            console.error("Transaction Error:", error);
+        }
+    };
 
     return (
         <div className="max-w-2xl mx-auto p-6 bg-white rounded shadow">
@@ -185,7 +185,7 @@ const alertmsg =()=>{
                     ))}
                     <button type="button" onClick={addMilestone} className="text-blue-500 mt-2">+ Add Milestone</button>
                 </div>
-                <button type="submit" onClick={alertmsg}  className="bg-blue-600 text-white px-6 py-2 rounded font-semibold">Create Campaign</button>
+                <button type="submit" onClick={alertmsg} className="bg-blue-600 text-white px-6 py-2 rounded font-semibold">Create Campaign</button>
             </form>
         </div>
     );

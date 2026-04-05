@@ -8,7 +8,7 @@ import { WagmiProvider } from "wagmi";
 import { config } from "@/lib/wagmiConfig";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import "./globals.css";
+import "./globals.css"
 const queryClient = new QueryClient();
 
 const geistSans = Geist({
