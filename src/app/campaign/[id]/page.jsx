@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
+  useAccount,
   useReadContract,
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
 import { formatEther, parseEther } from "viem";
 import { contractABI, contractAddress } from "@/lib/contract";
+import { getIpfsImageUrl } from "@/lib/ipfs";
 
 const formatEth = (value) => {
   const asEth = Number(formatEther(value ?? 0n));
@@ -40,6 +42,7 @@ const getDeadlineText = (deadline) => {
 };
 
 export default function CampaignDetailsPage() {
+  const { address } = useAccount();
   const params = useParams();
   const campaignId = useMemo(() => {
     const raw = params?.id;
@@ -50,6 +53,9 @@ export default function CampaignDetailsPage() {
 
   const [donationAmount, setDonationAmount] = useState("");
   const [donationError, setDonationError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [voteError, setVoteError] = useState("");
+  const [activeMilestoneId, setActiveMilestoneId] = useState(null);
 
   const {
     data: campaign,
@@ -65,8 +71,47 @@ export default function CampaignDetailsPage() {
     },
   });
 
+  const {
+    data: milestones,
+    isLoading: isLoadingMilestones,
+    refetch: refetchMilestones,
+  } = useReadContract({
+    address: contractAddress,
+    abi: contractABI,
+    functionName: "getMilestones",
+    args: campaignId !== null ? [campaignId] : undefined,
+    query: {
+      enabled: campaignId !== null,
+    },
+  });
+
+  const { data: donatorData } = useReadContract({
+    address: contractAddress,
+    abi: contractABI,
+    functionName: "getDonators",
+    args: campaignId !== null ? [campaignId] : undefined,
+    query: {
+      enabled: campaignId !== null,
+    },
+  });
+
   const { writeContract, data: donationHash, isPending: isSendingDonation } =
     useWriteContract();
+  const {
+    writeContract: writeCancel,
+    data: cancelHash,
+    isPending: isSendingCancel,
+  } = useWriteContract();
+  const {
+    writeContract: writeRefund,
+    data: refundHash,
+    isPending: isSendingRefund,
+  } = useWriteContract();
+  const {
+    writeContract: writeVoteMilestone,
+    data: voteMilestoneHash,
+    isPending: isSendingVote,
+  } = useWriteContract();
 
   const {
     isLoading: isConfirmingDonation,
@@ -76,11 +121,47 @@ export default function CampaignDetailsPage() {
     hash: donationHash,
   });
 
+  const {
+    isLoading: isConfirmingCancel,
+    isSuccess: isCancelSuccess,
+    isError: isCancelFailed,
+  } = useWaitForTransactionReceipt({
+    hash: cancelHash,
+  });
+
+  const {
+    isLoading: isConfirmingRefund,
+    isSuccess: isRefundSuccess,
+    isError: isRefundFailed,
+  } = useWaitForTransactionReceipt({
+    hash: refundHash,
+  });
+
+  const {
+    isLoading: isConfirmingVote,
+    isSuccess: isVoteSuccess,
+    isError: isVoteFailed,
+  } = useWaitForTransactionReceipt({
+    hash: voteMilestoneHash,
+  });
+
   useEffect(() => {
     if (!isDonationSuccess) return;
     setDonationAmount("");
     void refetchCampaign();
   }, [isDonationSuccess, refetchCampaign]);
+
+  useEffect(() => {
+    if (!isCancelSuccess && !isRefundSuccess) return;
+    void refetchCampaign();
+  }, [isCancelSuccess, isRefundSuccess, refetchCampaign]);
+
+  useEffect(() => {
+    if (!isVoteSuccess) return;
+    setActiveMilestoneId(null);
+    void refetchMilestones();
+    void refetchCampaign();
+  }, [isVoteSuccess, refetchMilestones, refetchCampaign]);
 
   const handleDonate = () => {
     if (campaignId === null) {
@@ -114,6 +195,56 @@ export default function CampaignDetailsPage() {
     }
   };
 
+  const handleCancelCampaign = () => {
+    if (campaignId === null) return;
+
+    try {
+      setActionError("");
+      writeCancel({
+        address: contractAddress,
+        abi: contractABI,
+        functionName: "cancelCampaign",
+        args: [campaignId],
+      });
+    } catch {
+      setActionError("Cancel transaction could not be started.");
+    }
+  };
+
+  const handleRefund = () => {
+    if (campaignId === null) return;
+
+    try {
+      setActionError("");
+      writeRefund({
+        address: contractAddress,
+        abi: contractABI,
+        functionName: "refund",
+        args: [campaignId],
+      });
+    } catch {
+      setActionError("Refund transaction could not be started.");
+    }
+  };
+
+  const handleVoteMilestone = (milestoneId) => {
+    if (campaignId === null) return;
+
+    try {
+      setVoteError("");
+      setActiveMilestoneId(milestoneId);
+      writeVoteMilestone({
+        address: contractAddress,
+        abi: contractABI,
+        functionName: "voteMilestone",
+        args: [campaignId, BigInt(milestoneId)],
+      });
+    } catch {
+      setActiveMilestoneId(null);
+      setVoteError("Vote transaction could not be started.");
+    }
+  };
+
   const campaignData = useMemo(() => {
     if (!campaign) return null;
 
@@ -130,6 +261,42 @@ export default function CampaignDetailsPage() {
       cancelled,
     };
   }, [campaign]);
+
+  const isCreator =
+    campaignData && address
+      ? campaignData.owner.toLowerCase() === address.toLowerCase()
+      : false;
+
+  const milestoneList = useMemo(() => {
+    if (!Array.isArray(milestones)) return [];
+
+    return milestones.map((milestone, index) => {
+      if (Array.isArray(milestone)) {
+        return {
+          id: index,
+          title: milestone[0] || `Milestone ${index + 1}`,
+          amount: milestone[1] ?? 0n,
+          voteWeight: milestone[2] ?? 0n,
+          released: Boolean(milestone[3]),
+        };
+      }
+
+      return {
+        id: index,
+        title: milestone?.title || `Milestone ${index + 1}`,
+        amount: milestone?.amount ?? 0n,
+        voteWeight: milestone?.voteWeight ?? 0n,
+        released: Boolean(milestone?.released),
+      };
+    });
+  }, [milestones]);
+
+  const donorAddresses = useMemo(() => {
+    if (!Array.isArray(donatorData) || !Array.isArray(donatorData[0])) return [];
+    return donatorData[0].map((item) => String(item).toLowerCase());
+  }, [donatorData]);
+
+  const isInvestor = address ? donorAddresses.includes(address.toLowerCase()) : false;
 
   if (campaignId === null) {
     return (
@@ -172,7 +339,7 @@ export default function CampaignDetailsPage() {
           <div className="h-64 w-full bg-muted/30 md:h-80">
             {campaignData.image ? (
               <img
-                src={campaignData.image}
+                src={getIpfsImageUrl(campaignData.image)}
                 alt={campaignData.title || "Campaign image"}
                 className="h-full w-full object-cover"
               />
@@ -273,6 +440,133 @@ export default function CampaignDetailsPage() {
           )}
           {isDonationSuccess && (
             <p className="mt-3 text-xs text-green-600">Donation successful. Thank you for supporting.</p>
+          )}
+
+          <div className="mt-6 rounded-xl border border-border/70 bg-background/60 p-4">
+            <h3 className="text-sm font-semibold text-foreground">Milestone Voting</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Investors can vote to approve milestones so funds can be released according to contract rules.
+            </p>
+
+            {isLoadingMilestones ? (
+              <p className="mt-3 text-xs text-muted-foreground">Loading milestones...</p>
+            ) : milestoneList.length === 0 ? (
+              <p className="mt-3 text-xs text-muted-foreground">No milestones configured for this campaign.</p>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {milestoneList.map((milestone) => (
+                  <div
+                    key={milestone.id}
+                    className="rounded-lg border border-border bg-card p-3"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{milestone.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Amount: {formatEth(milestone.amount)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Votes: {formatEth(milestone.voteWeight)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Status: {milestone.released ? "Released" : "Pending"}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleVoteMilestone(milestone.id)}
+                        disabled={
+                          !isInvestor ||
+                          campaignData.cancelled ||
+                          milestone.released ||
+                          isSendingVote ||
+                          isConfirmingVote
+                        }
+                        className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                      >
+                        {(isSendingVote || isConfirmingVote) && activeMilestoneId === milestone.id
+                          ? "Voting..."
+                          : "Vote to Release"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!isInvestor && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Only investors who donated can vote on milestones.
+              </p>
+            )}
+            {voteError && <p className="mt-3 text-xs text-red-600">{voteError}</p>}
+            {isVoteFailed && (
+              <p className="mt-3 text-xs text-red-600">Vote failed. Make sure your wallet is connected and you are eligible to vote.</p>
+            )}
+            {isVoteSuccess && (
+              <p className="mt-3 text-xs text-green-600">Vote submitted successfully.</p>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="text-lg font-semibold text-foreground">Campaign Controls</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The creator can cancel the campaign. After cancellation, contributors can claim a refund from the remaining balance.
+          </p>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={handleCancelCampaign}
+              disabled={
+                !isCreator ||
+                campaignData.cancelled ||
+                isSendingCancel ||
+                isConfirmingCancel
+              }
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {isSendingCancel || isConfirmingCancel
+                ? "Cancelling..."
+                : "Cancel Campaign"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRefund}
+              disabled={
+                !campaignData.cancelled ||
+                isSendingRefund ||
+                isConfirmingRefund
+              }
+              className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground disabled:opacity-50"
+            >
+              {isSendingRefund || isConfirmingRefund
+                ? "Refunding..."
+                : "Claim Refund"}
+            </button>
+          </div>
+
+          {!isCreator && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Only the campaign creator can cancel this campaign.
+            </p>
+          )}
+
+          {actionError && <p className="mt-3 text-xs text-red-600">{actionError}</p>}
+          {isCancelFailed && (
+            <p className="mt-3 text-xs text-red-600">Cancel failed. Please try again.</p>
+          )}
+          {isCancelSuccess && (
+            <p className="mt-3 text-xs text-green-600">Campaign cancelled successfully.</p>
+          )}
+          {isRefundFailed && (
+            <p className="mt-3 text-xs text-red-600">Refund failed. If you did not donate, there is no refundable balance.</p>
+          )}
+          {isRefundSuccess && (
+            <p className="mt-3 text-xs text-green-600">Refund claimed successfully.</p>
           )}
         </section>
       </div>

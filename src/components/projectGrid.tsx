@@ -7,6 +7,7 @@ import { contractAddress, contractABI } from "@/lib/contract";
 import { useReadContracts } from "wagmi";
 import { formatEther } from "viem";
 import Link from "next/link";
+import { getIpfsImageUrl } from "@/lib/ipfs";
 
 type CampaignCard = {
   id: bigint;
@@ -120,14 +121,14 @@ const ProjectGrid = () => {
                     <div className="h-40 relative overflow-hidden bg-muted/30">
                       {project.image ? (
                         <img
-                          src={project.image}
+                          src={getIpfsImageUrl(project.image)}
                           alt={project.title}
                           className="h-full w-full object-cover"
                         />
                       ) : (
                         <>
                           <div className="absolute inset-0 grid-pattern opacity-40" />
-                          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10" />
+                          <div className="absolute inset-0 bg-linear-to-br from-primary/10 to-secondary/10" />
                         </>
                       )}
 

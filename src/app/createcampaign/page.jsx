@@ -1,31 +1,48 @@
-"use client"
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { parseEther } from "ethers";
-import React, { useState } from "react";
-import { contractAddress, contractABI } from "@/lib/contract";
 import { useWriteContract } from "wagmi";
-import { useRouter } from 'next/navigation';
+import { contractAddress, contractABI } from "@/lib/contract";
 
 export default function Campaign() {
     const [form, setForm] = useState({
         title: "",
         description: "",
-        target: 0,
-        deadline: 0,
-        image: "",
+        target: "",
+        deadline: "",
         milestoneTitles: [""],
-        milestoneAmounts: [""]
+        milestoneAmounts: [""],
     });
+    const [imageFile, setImageFile] = useState(null);
+    const [imagePreview, setImagePreview] = useState("");
+    const [errorMessage, setErrorMessage] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const router = useRouter();
-
     const { writeContract } = useWriteContract();
+
+    useEffect(() => {
+        if (!imageFile) {
+            setImagePreview("");
+            return undefined;
+        }
+
+        const previewUrl = URL.createObjectURL(imageFile);
+        setImagePreview(previewUrl);
+
+        return () => URL.revokeObjectURL(previewUrl);
+    }, [imageFile]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        setErrorMessage("");
         setForm((prev) => ({ ...prev, [name]: value }));
     };
 
     const handleMilestoneChange = (idx, field, value) => {
+        setErrorMessage("");
         setForm((prev) => {
             const arr = [...prev[field]];
             arr[idx] = value;
@@ -37,7 +54,7 @@ export default function Campaign() {
         setForm((prev) => ({
             ...prev,
             milestoneTitles: [...prev.milestoneTitles, ""],
-            milestoneAmounts: [...prev.milestoneAmounts, ""]
+            milestoneAmounts: [...prev.milestoneAmounts, ""],
         }));
     };
 
@@ -48,25 +65,40 @@ export default function Campaign() {
             return { ...prev, milestoneTitles: titles, milestoneAmounts: amounts };
         });
     };
-    const alertmsg = () => {
-        e.preventDefault();
-        alert("Campaing created")
-        router.push('/');
 
-    }
+    const handleImageChange = (e) => {
+        setErrorMessage("");
+        setImageFile(e.target.files?.[0] ?? null);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setErrorMessage("");
+        setIsSubmitting(true);
 
         try {
+            if (!imageFile) {
+                throw new Error("Please choose an image before creating the campaign.");
+            }
+
+            const uploadFormData = new FormData();
+            uploadFormData.append("file", imageFile);
+
+            const uploadResponse = await fetch("/api/pinata", {
+                method: "POST",
+                body: uploadFormData,
+            });
+
+            const uploadResult = await uploadResponse.json();
+
+            if (!uploadResponse.ok) {
+                throw new Error(uploadResult?.error || "Image upload failed.");
+            }
 
             const deadlineUnix = BigInt(
                 Math.floor(new Date(form.deadline).getTime() / 1000)
             );
-
-
             const ethtarget = parseEther(form.target.toString());
-
-
             const milestoneAmountsWei = form.milestoneAmounts.map((amt) =>
                 parseEther(amt.toString())
             );
@@ -80,24 +112,32 @@ export default function Campaign() {
                     form.description,
                     ethtarget,
                     deadlineUnix,
-                    form.image,
+                    uploadResult.cid,
                     form.milestoneTitles,
                     milestoneAmountsWei,
                 ],
             });
 
-            // console.log(data)
-            alert("Campaing created")
-            router.push('/');
-
+            alert("Campaign created");
+            router.push("/");
         } catch (error) {
             console.error("Transaction Error:", error);
+            setErrorMessage(error instanceof Error ? error.message : "Something went wrong.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="max-w-2xl mx-auto p-6 bg-white rounded shadow">
-            <h1 className="text-2xl font-bold mb-4">Create Campaign</h1>
+        <div className="mx-auto max-w-2xl rounded bg-white p-6 shadow">
+            <h1 className="mb-4 text-2xl font-bold">Create Campaign</h1>
+
+            {errorMessage && (
+                <p className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {errorMessage}
+                </p>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label className="block font-medium">Title</label>
@@ -106,33 +146,36 @@ export default function Campaign() {
                         name="title"
                         value={form.title}
                         onChange={handleChange}
-                        className="w-full border rounded px-3 py-2"
+                        className="w-full rounded border px-3 py-2"
                         required
                     />
                 </div>
+
                 <div>
                     <label className="block font-medium">Description</label>
                     <textarea
                         name="description"
                         value={form.description}
                         onChange={handleChange}
-                        className="w-full border rounded px-3 py-2"
+                        className="w-full rounded border px-3 py-2"
                         required
                     />
                 </div>
+
                 <div>
                     <label className="block font-medium">Target (ETH)</label>
                     <input
                         type="number"
                         name="target"
-                        value={(form.target)}
+                        value={form.target}
                         onChange={handleChange}
-                        className="w-full border rounded px-3 py-2"
+                        className="w-full rounded border px-3 py-2"
                         required
                         min="0"
                         step="any"
                     />
                 </div>
+
                 <div>
                     <label className="block font-medium">Deadline</label>
                     <input
@@ -140,32 +183,41 @@ export default function Campaign() {
                         name="deadline"
                         value={form.deadline}
                         onChange={handleChange}
-                        className="w-full border rounded px-3 py-2"
+                        className="w-full rounded border px-3 py-2"
                         required
                     />
-                    <p className="text-xs text-gray-500 mt-1">Will be converted to Unix timestamp for contract</p>
+                    <p className="mt-1 text-xs text-gray-500">Will be converted to Unix timestamp for contract</p>
                 </div>
+
                 <div>
-                    <label className="block font-medium">Image URL</label>
+                    <label className="block font-medium">Campaign Image</label>
                     <input
-                        type="url"
-                        name="image"
-                        value={form.image}
-                        onChange={handleChange}
-                        className="w-full border rounded px-3 py-2"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="w-full rounded border px-3 py-2"
                         required
                     />
+                    <p className="mt-1 text-xs text-gray-500">The file will be uploaded to Pinata IPFS and its CID will be saved on-chain.</p>
+                    {imagePreview && (
+                        <img
+                            src={imagePreview}
+                            alt="Selected preview"
+                            className="mt-3 h-40 w-full rounded object-cover"
+                        />
+                    )}
                 </div>
+
                 <div>
                     <label className="block font-medium">Milestones</label>
                     {form.milestoneTitles.map((title, idx) => (
-                        <div key={idx} className="flex gap-2 mb-2">
+                        <div key={idx} className="mb-2 flex gap-2">
                             <input
                                 type="text"
                                 placeholder={`Milestone Title #${idx + 1}`}
                                 value={title}
                                 onChange={(e) => handleMilestoneChange(idx, "milestoneTitles", e.target.value)}
-                                className="flex-1 border rounded px-3 py-2"
+                                className="flex-1 rounded border px-3 py-2"
                                 required
                             />
                             <input
@@ -173,19 +225,28 @@ export default function Campaign() {
                                 placeholder="Amount (ETH)"
                                 value={form.milestoneAmounts[idx]}
                                 onChange={(e) => handleMilestoneChange(idx, "milestoneAmounts", e.target.value)}
-                                className="w-32 border rounded px-3 py-2"
+                                className="w-32 rounded border px-3 py-2"
                                 required
                                 min="0"
                                 step="any"
                             />
                             {form.milestoneTitles.length > 1 && (
-                                <button type="button" onClick={() => removeMilestone(idx)} className="text-red-500">Remove</button>
+                                <button type="button" onClick={() => removeMilestone(idx)} className="text-red-500">
+                                    Remove
+                                </button>
                             )}
                         </div>
                     ))}
-                    <button type="button" onClick={addMilestone} className="text-blue-500 mt-2">+ Add Milestone</button>
+                    <button type="button" onClick={addMilestone} className="mt-2 text-blue-500">+ Add Milestone</button>
                 </div>
-                <button type="submit" onClick={alertmsg} className="bg-blue-600 text-white px-6 py-2 rounded font-semibold">Create Campaign</button>
+
+                <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="rounded bg-blue-600 px-6 py-2 font-semibold text-white disabled:opacity-60"
+                >
+                    {isSubmitting ? "Creating..." : "Create Campaign"}
+                </button>
             </form>
         </div>
     );
