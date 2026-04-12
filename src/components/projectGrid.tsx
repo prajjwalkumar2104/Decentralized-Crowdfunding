@@ -18,6 +18,10 @@ type CampaignCard = {
   deadline: bigint;
   amountCollected: bigint;
   image: string;
+  token: string;
+  tokenSymbol: string;
+  tokenImage: string;
+  tokensPerEth: bigint;
   cancelled: boolean;
 };
 
@@ -27,8 +31,8 @@ const formatEth = (value: bigint) => {
 };
 
 const getProgress = (collected: bigint, target: bigint) => {
-  if (target <= 0n) return 0;
-  const ratio = Number((collected * 10000n) / target) / 100;
+  if (target <= BigInt(0)) return 0;
+  const ratio = Number((collected * BigInt(10000)) / target) / 100;
   return Math.min(100, Math.max(0, ratio));
 };
 
@@ -44,8 +48,8 @@ const ProjectGrid = () => {
   const isInView = useInView(ref, { once: true, margin: "-50px" });
 
   const { data: campaignIds, isLoading: loadingIds } = useReadContract({
-    address: contractAddress,
-    abi: contractABI,
+    address: contractAddress as `0x${string}`,
+    abi: contractABI as any,
     functionName: "getCampaigns",
   });
 
@@ -53,8 +57,8 @@ const ProjectGrid = () => {
 
   const { data: campaignsResult, isLoading: loadingCampaigns } = useReadContracts({
     contracts: typedCampaignIds.map((id) => ({
-      address: contractAddress,
-      abi: contractABI,
+      address: contractAddress as `0x${string}`,
+      abi: contractABI as any,
       functionName: "getCampaign",
       args: [id],
     })),
@@ -67,7 +71,7 @@ const ProjectGrid = () => {
     campaignsResult
       ?.map((item, index) => {
         if (item.status !== "success" || !item.result) return null;
-        const result = item.result as unknown as [string, string, string, bigint, bigint, bigint, string, boolean];
+        const result = item.result as unknown as [string, string, string, bigint, bigint, bigint, string, string, string, string, bigint, boolean];
         return {
           id: typedCampaignIds[index],
           owner: result[0],
@@ -77,7 +81,11 @@ const ProjectGrid = () => {
           deadline: result[4],
           amountCollected: result[5],
           image: result[6],
-          cancelled: result[7],
+          token: result[7],
+          tokenSymbol: result[8],
+          tokenImage: result[9],
+          tokensPerEth: result[10],
+          cancelled: result[11],
         };
       })
       .filter((campaign): campaign is CampaignCard => campaign !== null)

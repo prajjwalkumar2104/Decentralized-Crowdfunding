@@ -12,11 +12,16 @@ export default function Campaign() {
         description: "",
         target: "",
         deadline: "",
+        tokenName: "",
+        tokenSymbol: "",
+        tokensPerPointZeroOneEth: "",
         milestoneTitles: [""],
         milestoneAmounts: [""],
     });
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState("");
+    const [tokenImageFile, setTokenImageFile] = useState(null);
+    const [tokenImagePreview, setTokenImagePreview] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -34,6 +39,18 @@ export default function Campaign() {
 
         return () => URL.revokeObjectURL(previewUrl);
     }, [imageFile]);
+
+    useEffect(() => {
+        if (!tokenImageFile) {
+            setTokenImagePreview("");
+            return undefined;
+        }
+
+        const previewUrl = URL.createObjectURL(tokenImageFile);
+        setTokenImagePreview(previewUrl);
+
+        return () => URL.revokeObjectURL(previewUrl);
+    }, [tokenImageFile]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -71,6 +88,28 @@ export default function Campaign() {
         setImageFile(e.target.files?.[0] ?? null);
     };
 
+    const handleTokenImageChange = (e) => {
+        setErrorMessage("");
+        setTokenImageFile(e.target.files?.[0] ?? null);
+    };
+
+    const uploadImageToPinata = async (file) => {
+        const uploadFormData = new FormData();
+        uploadFormData.append("file", file);
+
+        const uploadResponse = await fetch("/api/pinata", {
+            method: "POST",
+            body: uploadFormData,
+        });
+
+        const uploadResult = await uploadResponse.json();
+        if (!uploadResponse.ok) {
+            throw new Error(uploadResult?.error || "Image upload failed.");
+        }
+
+        return uploadResult.cid;
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setErrorMessage("");
@@ -80,39 +119,69 @@ export default function Campaign() {
             if (!imageFile) {
                 throw new Error("Please choose an image before creating the campaign.");
             }
-
-            const uploadFormData = new FormData();
-            uploadFormData.append("file", imageFile);
-
-            const uploadResponse = await fetch("/api/pinata", {
-                method: "POST",
-                body: uploadFormData,
-            });
-
-            const uploadResult = await uploadResponse.json();
-
-            if (!uploadResponse.ok) {
-                throw new Error(uploadResult?.error || "Image upload failed.");
+            if (!tokenImageFile) {
+                throw new Error("Please choose a token image.");
             }
+
+            const campaignImageCid = await uploadImageToPinata(imageFile);
+            const tokenImageCid = await uploadImageToPinata(tokenImageFile);
 
             const deadlineUnix = BigInt(
                 Math.floor(new Date(form.deadline).getTime() / 1000)
             );
+            const nowUnix = BigInt(Math.floor(Date.now() / 1000));
+            if (deadlineUnix <= nowUnix) {
+                throw new Error("Deadline must be a future date.");
+            }
+
+            if (!form.target || Number(form.target) <= 0) {
+                throw new Error("Please enter a target greater than 0 ETH.");
+            }
+
+            if (!form.tokenName.trim()) throw new Error("Please enter a token name.");
+            if (!form.tokenSymbol.trim()) throw new Error("Please enter a token symbol.");
+            if (!form.tokensPerPointZeroOneEth || Number(form.tokensPerPointZeroOneEth) <= 0) {
+                throw new Error("Please enter a valid token rate (tokens per 0.01 ETH).");
+            }
+
             const ethtarget = parseEther(form.target.toString());
+            // Contract stores tokens per 1 ETH; UI captures tokens per 0.01 ETH for easier setup.
+            const tokensPerEth = BigInt(form.tokensPerPointZeroOneEth) * BigInt(100);
+
+            if (!form.milestoneTitles.length) {
+                throw new Error("Add at least one milestone.");
+            }
+            if (form.milestoneTitles.some((title) => !String(title || "").trim())) {
+                throw new Error("Every milestone must have a title.");
+            }
+
+            if (form.milestoneAmounts.some((amt) => !amt || Number(amt) <= 0)) {
+                throw new Error("Every milestone amount must be greater than 0 ETH.");
+            }
+
             const milestoneAmountsWei = form.milestoneAmounts.map((amt) =>
                 parseEther(amt.toString())
             );
 
+            const totalMilestonesWei = milestoneAmountsWei.reduce((acc, value) => acc + value, BigInt(0));
+            if (totalMilestonesWei > ethtarget) {
+                throw new Error("Total milestone amount cannot exceed campaign target.");
+            }
+
             writeContract({
                 address: contractAddress,
                 abi: contractABI,
-                functionName: "createCampaign",
+                functionName: "createCampaignWithToken",
                 args: [
                     form.title,
                     form.description,
                     ethtarget,
                     deadlineUnix,
-                    uploadResult.cid,
+                    campaignImageCid,
+                    form.tokenName.trim(),
+                    form.tokenSymbol.trim(),
+                    tokenImageCid,
+                    tokensPerEth,
                     form.milestoneTitles,
                     milestoneAmountsWei,
                 ],
@@ -187,6 +256,69 @@ export default function Campaign() {
                         required
                     />
                     <p className="mt-1 text-xs text-gray-500">Will be converted to Unix timestamp for contract</p>
+                </div>
+
+                <div>
+                    <label className="block font-medium">Token Name</label>
+                    <input
+                        type="text"
+                        name="tokenName"
+                        value={form.tokenName}
+                        onChange={handleChange}
+                        className="w-full rounded border px-3 py-2"
+                        placeholder="Example: ACME Equity"
+                        required
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Creator defines token identity for this campaign.</p>
+                </div>
+
+                <div>
+                    <label className="block font-medium">Token Symbol</label>
+                    <input
+                        type="text"
+                        name="tokenSymbol"
+                        value={form.tokenSymbol}
+                        onChange={handleChange}
+                        className="w-full rounded border px-3 py-2"
+                        placeholder="Example: ACME"
+                        required
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Short ticker shown in wallets and explorers.</p>
+                </div>
+
+                <div>
+                    <label className="block font-medium">Token Image</label>
+                    <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleTokenImageChange}
+                        className="w-full rounded border px-3 py-2"
+                        required
+                    />
+                    <p className="mt-1 text-xs text-gray-500">This image will be pinned to IPFS and linked with the token metadata.</p>
+                    {tokenImagePreview && (
+                        <img
+                            src={tokenImagePreview}
+                            alt="Token preview"
+                            className="mt-3 h-24 w-24 rounded object-cover"
+                        />
+                    )}
+                </div>
+
+                <div>
+                    <label className="block font-medium">Token Rate (per 0.01 ETH)</label>
+                    <input
+                        type="number"
+                        name="tokensPerPointZeroOneEth"
+                        value={form.tokensPerPointZeroOneEth}
+                        onChange={handleChange}
+                        className="w-full rounded border px-3 py-2"
+                        placeholder="Example: 1"
+                        required
+                        min="1"
+                        step="1"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Example: 1 means 0.01 ETH mints 1 token.</p>
                 </div>
 
                 <div>

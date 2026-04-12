@@ -176,8 +176,8 @@ export default function CampaignDetailsPage() {
     }
 
     const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      setDonationError("Amount must be greater than 0.");
+    if (!Number.isFinite(numericAmount) || numericAmount < 0.01) {
+      setDonationError("Amount must be at least 0.01 ETH.");
       return;
     }
 
@@ -248,7 +248,7 @@ export default function CampaignDetailsPage() {
   const campaignData = useMemo(() => {
     if (!campaign) return null;
 
-    const [owner, title, description, target, deadline, amountCollected, image, cancelled] = campaign;
+    const [owner, title, description, target, deadline, amountCollected, image, token, tokenSymbol, tokenImage, tokensPerEth, cancelled] = campaign;
 
     return {
       owner,
@@ -258,6 +258,10 @@ export default function CampaignDetailsPage() {
       deadline,
       amountCollected,
       image,
+      token,
+      tokenSymbol,
+      tokenImage,
+      tokensPerEth,
       cancelled,
     };
   }, [campaign]);
@@ -294,6 +298,32 @@ export default function CampaignDetailsPage() {
   const donorAddresses = useMemo(() => {
     if (!Array.isArray(donatorData) || !Array.isArray(donatorData[0])) return [];
     return donatorData[0].map((item) => String(item).toLowerCase());
+  }, [donatorData]);
+
+  const investorSummary = useMemo(() => {
+    if (!Array.isArray(donatorData)) return [];
+
+    const [addresses, amounts] = donatorData;
+    if (!Array.isArray(addresses) || !Array.isArray(amounts)) return [];
+
+    const totalsByAddress = new Map();
+
+    addresses.forEach((wallet, index) => {
+      const normalizedWallet = String(wallet || "").toLowerCase();
+      if (!normalizedWallet) return;
+
+      const currentAmount = BigInt(amounts[index] ?? 0n);
+      const existingAmount = totalsByAddress.get(normalizedWallet) ?? 0n;
+
+      totalsByAddress.set(normalizedWallet, existingAmount + currentAmount);
+    });
+
+    return Array.from(totalsByAddress.entries())
+      .map(([wallet, total]) => ({ wallet, total }))
+      .sort((a, b) => {
+        if (a.total === b.total) return 0;
+        return a.total > b.total ? -1 : 1;
+      });
   }, [donatorData]);
 
   const isInvestor = address ? donorAddresses.includes(address.toLowerCase()) : false;
@@ -374,6 +404,30 @@ export default function CampaignDetailsPage() {
                     {campaignData.cancelled ? "Cancelled" : "Active"}
                   </span>
                 </p>
+                <p>
+                  <span className="font-semibold text-foreground">Token: </span>
+                  <span className="text-muted-foreground">{truncateAddress(campaignData.token)}</span>
+                </p>
+                <p>
+                  <span className="font-semibold text-foreground">Token Symbol: </span>
+                  <span className="text-muted-foreground">{campaignData.tokenSymbol}</span>
+                </p>
+                <p>
+                  <span className="font-semibold text-foreground">Token Rate: </span>
+                  <span className="text-muted-foreground">
+                    0.01 ETH = {(campaignData.tokensPerEth / 100n).toString()} TOKENS
+                  </span>
+                </p>
+                {campaignData.tokenImage ? (
+                  <div className="pt-1">
+                    <p className="font-semibold text-foreground">Token Image:</p>
+                    <img
+                      src={getIpfsImageUrl(campaignData.tokenImage)}
+                      alt={`${campaignData.tokenSymbol} token`}
+                      className="mt-2 h-16 w-16 rounded object-cover"
+                    />
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -407,11 +461,12 @@ export default function CampaignDetailsPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Enter an amount in ETH and donate directly to this campaign.
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">Minimum donation: 0.01 ETH</p>
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <input
               type="number"
-              min="0"
+              min="0.01"
               step="any"
               value={donationAmount}
               onChange={(e) => {
@@ -506,6 +561,43 @@ export default function CampaignDetailsPage() {
             )}
             {isVoteSuccess && (
               <p className="mt-3 text-xs text-green-600">Vote submitted successfully.</p>
+            )}
+          </div>
+
+          <div className="mt-6 rounded-xl border border-border/70 bg-background/60 p-4">
+            <h3 className="text-sm font-semibold text-foreground">Investor Transparency</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Public list of wallets that invested in this campaign and their total contribution.
+            </p>
+
+            <div className="mt-3 flex items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-xs">
+              <span className="text-muted-foreground">Unique investors</span>
+              <span className="font-semibold text-foreground">{investorSummary.length}</span>
+            </div>
+
+            {investorSummary.length === 0 ? (
+              <p className="mt-3 text-xs text-muted-foreground">No investments yet for this campaign.</p>
+            ) : (
+              <div className="mt-3 overflow-x-auto rounded-lg border border-border bg-card">
+                <table className="min-w-full text-left text-xs">
+                  <thead className="border-b border-border bg-background/70 text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Wallet</th>
+                      <th className="px-3 py-2 font-medium">Total Invested</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {investorSummary.map((investor) => (
+                      <tr key={investor.wallet} className="border-b border-border last:border-b-0">
+                        <td className="px-3 py-2 font-mono text-foreground">
+                          {truncateAddress(investor.wallet)}
+                        </td>
+                        <td className="px-3 py-2 text-foreground">{formatEth(investor.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </section>
