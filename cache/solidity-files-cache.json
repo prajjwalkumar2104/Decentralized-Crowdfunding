@@ -38,8 +38,8 @@
       ]
     },
     "D:\\radiantfund\\Decentralized-Crowdfunding\\contracts\\CrowdfundingTokenized.sol": {
-      "lastModificationDate": 1776016692081,
-      "contentHash": "790799450c5cd5f9b107c27809dd2252",
+      "lastModificationDate": 1777179526491,
+      "contentHash": "79799717f70b1c4e6f223840c0fc9d1b",
       "sourceName": "contracts/CrowdfundingTokenized.sol",
       "solcConfig": {
         "version": "0.8.24",

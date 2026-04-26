@@ -38,9 +38,9 @@ const HeroSection = () => {
             </button></Link>
             
             
-            <button className="gradient-border rounded-xl px-8 py-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted w-full sm:w-auto">
+            {/* <button className="gradient-border rounded-xl px-8 py-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted w-full sm:w-auto">
               Explore Grants
-            </button>
+            </button> */}
           </div>
         </motion.div>
       </div>

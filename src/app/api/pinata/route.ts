@@ -44,11 +44,25 @@ export async function POST(request: Request) {
     headers.pinata_secret_api_key = pinataSecretApiKey;
   }
 
-  const response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
-    method: "POST",
-    headers,
-    body: pinataForm,
-  });
+  let response: Response;
+
+  try {
+    response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+      method: "POST",
+      headers,
+      body: pinataForm,
+    });
+  } catch (error) {
+    console.error("Pinata upload request failed:", error);
+
+    return NextResponse.json(
+      {
+        error:
+          "Unable to reach Pinata. Check your internet connection, DNS access, and PINATA_JWT / API key configuration.",
+      },
+      { status: 503 }
+    );
+  }
 
   if (!response.ok) {
     const errorText = await response.text();

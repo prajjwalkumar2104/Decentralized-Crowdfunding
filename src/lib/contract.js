@@ -110,6 +110,16 @@ export const contractABI = [
 		type: "function",
 	},
 	{
+		inputs: [
+			{ internalType: "uint256", name: "_id", type: "uint256" },
+			{ internalType: "address", name: "_investor", type: "address" },
+		],
+		name: "getInvestorTokenEarnings",
+		outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+		stateMutability: "view",
+		type: "function",
+	},
+	{
 		inputs: [],
 		name: "numberOfCampaigns",
 		outputs: [{ internalType: "uint256", name: "", type: "uint256" }],

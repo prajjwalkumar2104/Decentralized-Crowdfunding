@@ -9,7 +9,7 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
-import { formatEther, parseEther } from "viem";
+import { formatEther, formatUnits, isAddress, parseEther } from "viem";
 import { contractABI, contractAddress } from "@/lib/contract";
 import { getIpfsImageUrl } from "@/lib/ipfs";
 
@@ -56,6 +56,11 @@ export default function CampaignDetailsPage() {
   const [actionError, setActionError] = useState("");
   const [voteError, setVoteError] = useState("");
   const [activeMilestoneId, setActiveMilestoneId] = useState(null);
+  const [lookupAddress, setLookupAddress] = useState("");
+
+  const normalizedLookupAddress = lookupAddress.trim();
+  const isLookupAddressValid =
+    normalizedLookupAddress.length > 0 && isAddress(normalizedLookupAddress);
 
   const {
     data: campaign,
@@ -92,6 +97,19 @@ export default function CampaignDetailsPage() {
     args: campaignId !== null ? [campaignId] : undefined,
     query: {
       enabled: campaignId !== null,
+    },
+  });
+
+  const { data: investorTokenEarnings } = useReadContract({
+    address: contractAddress,
+    abi: contractABI,
+    functionName: "getInvestorTokenEarnings",
+    args:
+      campaignId !== null && isLookupAddressValid
+        ? [campaignId, normalizedLookupAddress]
+        : undefined,
+    query: {
+      enabled: campaignId !== null && isLookupAddressValid,
     },
   });
 
@@ -327,6 +345,13 @@ export default function CampaignDetailsPage() {
   }, [donatorData]);
 
   const isInvestor = address ? donorAddresses.includes(address.toLowerCase()) : false;
+
+  const lookupTokenDisplay = useMemo(() => {
+    if (!isLookupAddressValid) return null;
+
+    const rawValue = investorTokenEarnings ?? 0n;
+    return formatUnits(rawValue, 18);
+  }, [investorTokenEarnings, isLookupAddressValid]);
 
   if (campaignId === null) {
     return (
@@ -569,6 +594,33 @@ export default function CampaignDetailsPage() {
             <p className="mt-1 text-xs text-muted-foreground">
               Public list of wallets that invested in this campaign and their total contribution.
             </p>
+
+            <div className="mt-3 rounded-lg border border-border bg-card p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Token Earnings by Public Key
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Enter an investor wallet address to view all tokens earned in this campaign.
+              </p>
+              <input
+                type="text"
+                value={lookupAddress}
+                onChange={(e) => setLookupAddress(e.target.value)}
+                placeholder="0x... investor public key"
+                className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              {normalizedLookupAddress.length > 0 && !isLookupAddressValid && (
+                <p className="mt-2 text-xs text-red-600">Enter a valid wallet address.</p>
+              )}
+              {isLookupAddressValid && (
+                <div className="mt-2 rounded-md border border-border bg-background px-3 py-2 text-xs">
+                  <p className="text-muted-foreground">Total Tokens Earned</p>
+                  <p className="mt-1 font-semibold text-foreground">
+                    {lookupTokenDisplay} {campaignData.tokenSymbol}
+                  </p>
+                </div>
+              )}
+            </div>
 
             <div className="mt-3 flex items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-xs">
               <span className="text-muted-foreground">Unique investors</span>

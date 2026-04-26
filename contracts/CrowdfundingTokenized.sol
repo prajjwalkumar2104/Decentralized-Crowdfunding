@@ -41,14 +41,37 @@ contract CrowdfundingTokenized is ReentrancyGuard {
     mapping(uint256 => Milestone[]) private campaignMilestones;
     mapping(uint256 => mapping(address => uint256)) private contributions;
     mapping(uint256 => mapping(address => bool)) private hasRefunded;
-    mapping(uint256 => mapping(uint256 => mapping(address => bool))) private hasVoted;
+    mapping(uint256 => mapping(uint256 => mapping(address => bool)))
+        private hasVoted;
 
-    event CampaignCreated(uint256 indexed campaignId, address indexed owner, address indexed token);
-    event DonationReceived(uint256 indexed campaignId, address indexed investor, uint256 amount, uint256 mintedTokens);
+    event CampaignCreated(
+        uint256 indexed campaignId,
+        address indexed owner,
+        address indexed token
+    );
+    event DonationReceived(
+        uint256 indexed campaignId,
+        address indexed investor,
+        uint256 amount,
+        uint256 mintedTokens
+    );
     event CampaignCancelled(uint256 indexed campaignId);
-    event Refunded(uint256 indexed campaignId, address indexed investor, uint256 amount);
-    event MilestoneVoted(uint256 indexed campaignId, uint256 indexed milestoneId, address indexed investor, uint256 weight);
-    event MilestoneReleased(uint256 indexed campaignId, uint256 indexed milestoneId, uint256 amount);
+    event Refunded(
+        uint256 indexed campaignId,
+        address indexed investor,
+        uint256 amount
+    );
+    event MilestoneVoted(
+        uint256 indexed campaignId,
+        uint256 indexed milestoneId,
+        address indexed investor,
+        uint256 weight
+    );
+    event MilestoneReleased(
+        uint256 indexed campaignId,
+        uint256 indexed milestoneId,
+        uint256 amount
+    );
 
     function _createCampaignInternal(
         string memory _title,
@@ -69,7 +92,10 @@ contract CrowdfundingTokenized is ReentrancyGuard {
         require(bytes(_tokenSymbol).length > 0, "Token symbol required");
         require(bytes(_tokenImage).length > 0, "Token image required");
         require(_tokensPerEth > 0, "Rate must be > 0");
-        require(_milestoneTitles.length == _milestoneAmounts.length, "Milestone mismatch");
+        require(
+            _milestoneTitles.length == _milestoneAmounts.length,
+            "Milestone mismatch"
+        );
         require(_milestoneTitles.length > 0, "At least one milestone required");
 
         uint256 totalMilestoneAmount;
@@ -88,7 +114,10 @@ contract CrowdfundingTokenized is ReentrancyGuard {
         }
 
         require(totalMilestoneAmount <= _target, "Milestones exceed target");
-        require(ICampaignToken(_token).owner() == address(this), "Token owner must be crowdfunding");
+        require(
+            ICampaignToken(_token).owner() == address(this),
+            "Token owner must be crowdfunding"
+        );
 
         campaigns[numberOfCampaigns] = Campaign({
             owner: payable(msg.sender),
@@ -106,7 +135,6 @@ contract CrowdfundingTokenized is ReentrancyGuard {
         });
 
         emit CampaignCreated(numberOfCampaigns, msg.sender, _token);
-
         numberOfCampaigns++;
         return numberOfCampaigns - 1;
     }
@@ -124,19 +152,20 @@ contract CrowdfundingTokenized is ReentrancyGuard {
         string[] memory _milestoneTitles,
         uint256[] memory _milestoneAmounts
     ) external returns (uint256) {
-        return _createCampaignInternal(
-            _title,
-            _description,
-            _target,
-            _deadline,
-            _image,
-            _token,
-            _tokenSymbol,
-            _tokenImage,
-            _tokensPerEth,
-            _milestoneTitles,
-            _milestoneAmounts
-        );
+        return
+            _createCampaignInternal(
+                _title,
+                _description,
+                _target,
+                _deadline,
+                _image,
+                _token,
+                _tokenSymbol,
+                _tokenImage,
+                _tokensPerEth,
+                _milestoneTitles,
+                _milestoneAmounts
+            );
     }
 
     function createCampaignWithToken(
@@ -155,21 +184,26 @@ contract CrowdfundingTokenized is ReentrancyGuard {
         require(bytes(_tokenName).length > 0, "Token name required");
         require(bytes(_tokenSymbol).length > 0, "Token symbol required");
 
-        CampaignToken token = new CampaignToken(_tokenName, _tokenSymbol, address(this));
-
-        return _createCampaignInternal(
-            _title,
-            _description,
-            _target,
-            _deadline,
-            _image,
-            address(token),
+        CampaignToken token = new CampaignToken(
+            _tokenName,
             _tokenSymbol,
-            _tokenImage,
-            _tokensPerEth,
-            _milestoneTitles,
-            _milestoneAmounts
+            address(this)
         );
+
+        return
+            _createCampaignInternal(
+                _title,
+                _description,
+                _target,
+                _deadline,
+                _image,
+                address(token),
+                _tokenSymbol,
+                _tokenImage,
+                _tokensPerEth,
+                _milestoneTitles,
+                _milestoneAmounts
+            );
     }
 
     function donateToCampaign(uint256 _id) external payable nonReentrant {
@@ -182,10 +216,8 @@ contract CrowdfundingTokenized is ReentrancyGuard {
 
         campaignDonators[_id].push(msg.sender);
         campaignDonations[_id].push(msg.value);
-
         contributions[_id][msg.sender] += msg.value;
         campaign.amountCollected += msg.value;
-
         // If tokensPerEth = 10, then 1 ETH (1e18 wei) mints 10e18 token units.
         uint256 mintedAmount = msg.value * campaign.tokensPerEth;
         ICampaignToken(campaign.token).mint(msg.sender, mintedAmount);
@@ -195,11 +227,9 @@ contract CrowdfundingTokenized is ReentrancyGuard {
 
     function cancelCampaign(uint256 _id) external {
         Campaign storage campaign = campaigns[_id];
-
         require(campaign.owner != address(0), "Campaign not found");
         require(msg.sender == campaign.owner, "Only creator");
         require(!campaign.cancelled, "Already cancelled");
-
         campaign.cancelled = true;
         emit CampaignCancelled(_id);
     }
@@ -207,53 +237,59 @@ contract CrowdfundingTokenized is ReentrancyGuard {
     function refund(uint256 _id) external nonReentrant {
         Campaign storage campaign = campaigns[_id];
         uint256 contributed = contributions[_id][msg.sender];
-
         require(campaign.owner != address(0), "Campaign not found");
         require(campaign.cancelled, "Campaign not cancelled");
         require(contributed > 0, "No contribution");
         require(!hasRefunded[_id][msg.sender], "Already refunded");
-
         hasRefunded[_id][msg.sender] = true;
-
         (bool sent, ) = payable(msg.sender).call{value: contributed}("");
         require(sent, "Refund failed");
-
         emit Refunded(_id, msg.sender, contributed);
     }
 
     function voteMilestone(uint256 _id, uint256 _milestoneId) external {
         Campaign storage campaign = campaigns[_id];
-
         require(campaign.owner != address(0), "Campaign not found");
         require(!campaign.cancelled, "Campaign cancelled");
-        require(_milestoneId < campaignMilestones[_id].length, "Invalid milestone");
+        require(
+            _milestoneId < campaignMilestones[_id].length,
+            "Invalid milestone"
+        );
         require(contributions[_id][msg.sender] > 0, "Only investors can vote");
         require(!hasVoted[_id][_milestoneId][msg.sender], "Already voted");
-
         Milestone storage milestone = campaignMilestones[_id][_milestoneId];
         require(!milestone.released, "Milestone released");
-
         hasVoted[_id][_milestoneId][msg.sender] = true;
         uint256 weight = contributions[_id][msg.sender];
         milestone.voteWeight += weight;
-
         emit MilestoneVoted(_id, _milestoneId, msg.sender, weight);
     }
 
-    function releaseMilestone(uint256 _id, uint256 _milestoneId) external nonReentrant {
+    function releaseMilestone(
+        uint256 _id,
+        uint256 _milestoneId
+    ) external nonReentrant {
         Campaign storage campaign = campaigns[_id];
-
         require(campaign.owner != address(0), "Campaign not found");
         require(msg.sender == campaign.owner, "Only creator");
         require(!campaign.cancelled, "Campaign cancelled");
-        require(_milestoneId < campaignMilestones[_id].length, "Invalid milestone");
+        require(
+            _milestoneId < campaignMilestones[_id].length,
+            "Invalid milestone"
+        );
 
         Milestone storage milestone = campaignMilestones[_id][_milestoneId];
         require(!milestone.released, "Milestone already released");
 
         // > 50% of raised capital (weighted by investment) must approve.
-        require(milestone.voteWeight * 2 > campaign.amountCollected, "Not enough votes");
-        require(address(this).balance >= milestone.amount, "Insufficient contract balance");
+        require(
+            milestone.voteWeight * 2 > campaign.amountCollected,
+            "Not enough votes"
+        );
+        require(
+            address(this).balance >= milestone.amount,
+            "Insufficient contract balance"
+        );
 
         milestone.released = true;
 
@@ -263,7 +299,9 @@ contract CrowdfundingTokenized is ReentrancyGuard {
         emit MilestoneReleased(_id, _milestoneId, milestone.amount);
     }
 
-    function getCampaign(uint256 _id)
+    function getCampaign(
+        uint256 _id
+    )
         external
         view
         returns (
@@ -305,11 +343,26 @@ contract CrowdfundingTokenized is ReentrancyGuard {
         }
     }
 
-    function getDonators(uint256 _id) external view returns (address[] memory, uint256[] memory) {
+    function getDonators(
+        uint256 _id
+    ) external view returns (address[] memory, uint256[] memory) {
         return (campaignDonators[_id], campaignDonations[_id]);
     }
 
-    function getMilestones(uint256 _id) external view returns (Milestone[] memory) {
+    function getMilestones(
+        uint256 _id
+    ) external view returns (Milestone[] memory) {
         return campaignMilestones[_id];
+    }
+
+    function getInvestorTokenEarnings(
+        uint256 _id,
+        address _investor
+    ) external view returns (uint256) {
+        Campaign storage campaign = campaigns[_id];
+        require(campaign.owner != address(0), "Campaign not found");
+        require(_investor != address(0), "Invalid investor");
+
+        return contributions[_id][_investor] * campaign.tokensPerEth;
     }
 }
