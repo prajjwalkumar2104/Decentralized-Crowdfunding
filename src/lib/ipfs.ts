@@ -1,6 +1,6 @@
 const DEFAULT_IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/";
 
-export const getIpfsImageUrl = (value) => {
+export const getIpfsImageUrl = (value: string) => {
   if (!value) return "";
 
   if (value.startsWith("http://") || value.startsWith("https://")) {
