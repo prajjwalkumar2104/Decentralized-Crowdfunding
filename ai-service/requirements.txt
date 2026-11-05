@@ -1,0 +1,16 @@
+# ─── Web Framework ────────────────────────────────────────────────────────────
+fastapi==0.115.5          # REST API framework - creates our /health and /api/risk-score endpoints
+uvicorn[standard]==0.32.1 # ASGI server - this is what RUNS the FastAPI application
+
+# ─── Data Validation ──────────────────────────────────────────────────────────
+pydantic==2.10.1          # Defines the shape of request/response data, auto-validates inputs
+
+# ─── Machine Learning ─────────────────────────────────────────────────────────
+scikit-learn==1.5.2       # Random Forest model, train/test split, evaluation metrics
+pandas==2.2.3             # Loads and manipulates the dataset (CSV files, DataFrames)
+numpy==2.1.3              # Numerical operations (std deviation, mean, array math)
+joblib==1.4.2             # Saves and loads the trained model to/from disk
+
+# ─── Testing ──────────────────────────────────────────────────────────────────
+pytest==8.3.3             # Test runner
+httpx==0.28.0             # Async HTTP client used in API tests (to call FastAPI endpoints)

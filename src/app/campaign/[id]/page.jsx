@@ -12,6 +12,7 @@ import {
 import { formatEther, formatUnits, isAddress, parseEther } from "viem";
 import { contractABI, contractAddress } from "@/lib/contract";
 import { getIpfsImageUrl } from "@/lib/ipfs";
+import RiskAssessmentCard from "@/components/RiskAssessmentCard";
 
 const formatEth = (value) => {
   const asEth = Number(formatEther(value ?? 0n));
@@ -653,6 +654,9 @@ export default function CampaignDetailsPage() {
             )}
           </div>
         </section>
+
+        {/* AI Fraud-Risk Assessment Section */}
+        <RiskAssessmentCard campaignId={campaignId !== null ? campaignId.toString() : null} />
 
         <section className="rounded-2xl border border-border bg-card p-6">
           <h2 className="text-lg font-semibold text-foreground">Campaign Controls</h2>

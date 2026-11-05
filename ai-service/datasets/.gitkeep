@@ -1,0 +1,3 @@
+# datasets/ — stores generated CSV files
+# .gitignore excludes *.csv from this folder.
+# To regenerate: python ml/generate_dataset.py

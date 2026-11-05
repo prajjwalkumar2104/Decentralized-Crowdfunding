@@ -1,0 +1,3 @@
+# models/ — stores the saved trained model (model.joblib)
+# .gitignore excludes *.joblib from this folder.
+# To regenerate: python ml/train.py
